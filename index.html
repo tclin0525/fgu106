@@ -77,6 +77,11 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
+    <!-- 🚨 雲端連線智慧診斷紅條 (預設隱藏，若出錯會自動跳出中文病因引導) -->
+    <div id="system-error-banner" class="hidden bg-red-600 text-white text-xs font-bold text-center py-3 px-4 sticky top-0 z-50 shadow-md">
+        <!-- 智慧錯誤引導文字將自動塞入這裡 -->
+    </div>
+
     <!-- 雲端載入進度提示 -->
     <div id="cloud-loading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-cream-50 bg-opacity-95 transition-opacity duration-300">
         <div class="relative flex items-center justify-center">
@@ -621,6 +626,15 @@
             }
         }
 
+        // 顯示頂部系統錯誤診斷 Banner 的輔助函式
+        function showSystemErrorBanner(message) {
+            const banner = document.getElementById('system-error-banner');
+            if (banner) {
+                banner.textContent = message;
+                banner.classList.remove('hidden');
+            }
+        }
+
         // 極速強退進度提示功能 (Auto-Dismiss after 3 seconds)
         function dismissLoader() {
             const loader = document.getElementById('cloud-loading');
@@ -653,13 +667,19 @@
                     await signInAnonymously(auth);
                 }
             } catch (e) {
-                try {
-                    await signInAnonymously(auth);
-                } catch (err) {
-                    console.error("Auth Exception:", err);
-                    showToast("身份驗證異常，啟用離線填寫", "error");
-                    dismissLoader(); // 認證異常，立刻解鎖畫面
+                console.error("Auth Exception:", e);
+                dismissLoader(); // 認證異常，立刻解鎖畫面
+                
+                // ⚙️ 智慧錯誤診斷機制
+                let friendlyMsg = "雲端認證失敗！";
+                if (e.code === 'auth/operation-not-allowed') {
+                    friendlyMsg = "⚠️ 錯誤：您尚未在 Firebase Console 啟用『匿名登入』！請前往 驗證 (Authentication) -> 登入方法 (Sign-in method) 啟用匿名。";
+                } else if (e.code === 'auth/unauthorized-domain') {
+                    friendlyMsg = "⚠️ 錯誤：網域未授權！請前往 Firebase Console -> 驗證 (Authentication) -> 設定 (Settings) -> 授權網域 (Authorized domains) 新增白名單：tclin0525.github.io";
+                } else {
+                    friendlyMsg = `⚠️ 雲端連線失敗：${e.message} (代碼: ${e.code || 'unknown'})`;
                 }
+                showSystemErrorBanner(friendlyMsg);
             }
         }
 
@@ -695,8 +715,10 @@
 
                 bookings = tempBookings;
 
-                // 成功同步，解鎖畫面
+                // 成功同步，解鎖畫面并隱藏可能的錯誤紅條
                 dismissLoader();
+                const banner = document.getElementById('system-error-banner');
+                if (banner) banner.classList.add('hidden');
 
                 updateLiveTimeline();
                 renderCalendar();
@@ -705,9 +727,11 @@
 
             }, (error) => {
                 console.error("Firestore Listen Error: ", error);
-                // 發生錯誤（例如安全規則拒絕讀取），解鎖畫面並提示，避免卡死
                 dismissLoader();
-                showToast("雲端連線失敗，請檢查資料庫安全規則！", "error");
+                
+                // 智慧 Firestore 錯誤診斷
+                let friendlyMsg = "⚠️ 讀取雲端資料庫失敗：請確認您的 Firestore Database『安全規則 (Rules)』已設定為 allow read, write: if true;";
+                showSystemErrorBanner(friendlyMsg);
             });
         }
 
@@ -869,7 +893,7 @@
         window.handleFormSubmit = async function(e) {
             e.preventDefault();
             if (!currentUser) {
-                showToast("尚未取得雲端授權，請稍候再試", "error");
+                showToast("尚未取得雲端授權，請稍候。請查看頁面最上方紅色提示排查！", "error");
                 return;
             }
 
