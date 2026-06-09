@@ -88,6 +88,20 @@
         <p class="text-xs text-cream-500 mt-1">系統將即時同步多人借用狀態，防重複衝突</p>
     </div>
 
+    <!-- 100% 物理防卡死安全鎖 (不論 Firebase 連線如何，3秒一到強制解鎖網頁) -->
+    <script>
+        setTimeout(function() {
+            const loader = document.getElementById('cloud-loading');
+            if (loader && !loader.classList.contains('opacity-0')) {
+                loader.classList.add('opacity-0');
+                setTimeout(function() {
+                    loader.style.display = 'none';
+                }, 300);
+                console.log("防卡死機制已啟動：載入畫面強制釋放！");
+            }
+        }, 3000);
+    </script>
+
     <!-- 主頂部導覽列 -->
     <header class="bg-cream-100 border-b border-cream-300 sticky top-0 z-40 shadow-sm no-print">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -616,9 +630,6 @@
             }
         }
 
-        // 安全設定：3 秒超時後，即使資料庫連線失敗也強制進入系統，避免白屏卡住
-        setTimeout(dismissLoader, 3000);
-
         // 2. 指數退避重試邏輯
         async function runWithBackoff(fn, retries = 5, delay = 1000) {
             try {
@@ -1136,6 +1147,7 @@
             renderPrintLayout(filtered, yearFilter, monthFilter);
         };
 
+        // 導出與列印配置
         function renderPrintLayout(filteredList, yFilter, mFilter) {
             const printBody = document.getElementById('print-table-body');
             printBody.innerHTML = '';
