@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暖心奶油風 - 場地使用登記與管理系統</title>
+    <title>空間預約登記系統</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -573,16 +573,16 @@
         if (typeof __firebase_config !== 'undefined' && __firebase_config) {
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
-    // 已替換為您專屬的 fgu106 雲端金鑰：
-    firebaseConfig = {
-        apiKey: "AIzaSyATH-KVWDAwrFVaimCubdIc4oz2t1XS9UU",
-        authDomain: "fgu106.firebaseapp.com",
-        projectId: "fgu106",
-        storageBucket: "fgu106.firebasestorage.app",
-        messagingSenderId: "1002069343961",
-        appId: "1:1002069343961:web:0f5b62a122d94ce44708c8"
-    };
-}
+            // 已自動整合您 fgu106 的專屬雲端金鑰，免除手動填寫的麻煩！
+            firebaseConfig = {
+                apiKey: "AIzaSyATH-KVWDAwrFVaimCubdIc4oz2t1XS9UU",
+                authDomain: "fgu106.firebaseapp.com",
+                projectId: "fgu106",
+                storageBucket: "fgu106.firebasestorage.app",
+                messagingSenderId: "1002069343961",
+                appId: "1:1002069343961:web:0f5b62a122d94ce44708c8"
+            };
+        }
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -594,7 +594,6 @@
         let pendingDeleteId = null;
 
         // 【管理員安全密碼設定】
-        // 已成功將預設管理密碼修改為 'fgu106'
         const ADMIN_ACCESS_KEY = "fgu106";
         let isAdmin = false;
 
@@ -607,6 +606,18 @@
                 TIME_SLOTS.push(`${hStr}:30`);
             }
         }
+
+        // 極速強退進度提示功能 (Auto-Dismiss after 3 seconds)
+        function dismissLoader() {
+            const loader = document.getElementById('cloud-loading');
+            if (loader && loader.style.display !== 'none') {
+                loader.classList.add('opacity-0');
+                setTimeout(() => loader.style.display = 'none', 300);
+            }
+        }
+
+        // 安全設定：3 秒超時後，即使資料庫連線失敗也強制進入系統，避免白屏卡住
+        setTimeout(dismissLoader, 3000);
 
         // 2. 指數退避重試邏輯
         async function runWithBackoff(fn, retries = 5, delay = 1000) {
@@ -635,7 +646,8 @@
                     await signInAnonymously(auth);
                 } catch (err) {
                     console.error("Auth Exception:", err);
-                    showToast("身份匿名認證失敗，請重新整理", "error");
+                    showToast("身份驗證異常，啟用離線填寫", "error");
+                    dismissLoader(); // 認證異常，立刻解鎖畫面
                 }
             }
         }
@@ -672,11 +684,8 @@
 
                 bookings = tempBookings;
 
-                const loader = document.getElementById('cloud-loading');
-                if (loader) {
-                    loader.classList.add('opacity-0');
-                    setTimeout(() => loader.style.display = 'none', 300);
-                }
+                // 成功同步，解鎖畫面
+                dismissLoader();
 
                 updateLiveTimeline();
                 renderCalendar();
@@ -685,7 +694,9 @@
 
             }, (error) => {
                 console.error("Firestore Listen Error: ", error);
-                showToast("同步雲端失敗，請確認網路或重新整頁", "error");
+                // 發生錯誤（例如安全規則拒絕讀取），解鎖畫面並提示，避免卡死
+                dismissLoader();
+                showToast("雲端連線失敗，請檢查資料庫安全規則！", "error");
             });
         }
 
